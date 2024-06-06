@@ -2,7 +2,7 @@
 def issueKey = 'DS-1'
 
 // Fetch the issue object from the key
-def issue = get("/rest/api/2/issue/${issueKey}")
+def issue = get("/rest/api/2/issue/${issue.key}")
         .header('Content-Type', 'application/json')
         .asObject(Map)
         .body
@@ -15,76 +15,70 @@ def customField = get("/rest/api/2/field")
         .asObject(List)
         .body
         .find {
-            (it as Map).name == 'Billability'
+                (it as Map).name == 'Billability'
         } as Map
 
-// Extract and store the option from the radio buttons custom field
-def customFieldValue = (fields[customField.id] as Map).value
+assert customField : "Failed to find custom field with given name"
 
 
-if (customFieldValue == 'Billable'){
 
-    //1. Add a user to be inserted as a watcher
-    addWatcher(issue.key)
+// Extract and store the option from the custom field
+def value = (fields[customField.id] as Map)?.value
+if (value == 'Billable'){
+    //1. Add a watcher   
+    String accountId = '557058:17217ad2-09b8-4692-8726-8e644e401aec'
+    addWatcher(issue.key, accountId)
 
-    //2. Insert a comment
-    String comment =  "The issue has been reviewed"
+    //2. Add a comment
+    String comment = 'Hey, this issue has changed'
     addComment(issue.key, comment)
 
-    //3. Updates the value
-    updateIssue(issue.id, customFiel.id, 'Reviewed Billability')
-    logger.info "The issue has been reviewed:"
+    //3. Update fields    
+    updateIssue(issue.key, customField.id, 'Billability Reviewed')
 }
 
 
 
-
-
 /**
- * Add a comment into an issue
- * @param issue Issue where to put a comment
- * @param commentBody Text to write
+ * Add a watcher given the accountId of the user into the issueKey
  */
-def addComment(String issueKey, String commentBody){
-    post("/rest/api/2/issue/${issueKey}/comment")
-            .header("Content-Type", "application/json")
-            .body([
-                    body: commentBody,
-            ])
-            .asString()
+void addWatcher(String issueKey, String accountId){
+    HttpResponse result = post("/rest/api/3/issue/${issueKey}/watchers")
+                    .header('Content-Type', 'application/json')
+                    .body("\"${accountId}\"")
+                    .asJson()
+
+    result
 }
 
 
 /**
- * Update the fields of fieldsUpdated map of the given issue
- * @param issueKey , the key of the issue to update
- * @param fieldsUpdated , a map with the fields to update, the format
- * is fieldKey: value as object
+ * Add a comment in an issue given its issueKey
  */
-void updateIssue(String issueKey, Map fieldsUpdated) {
+void addComment(String issueKey, String commentBody){
+   post("/rest/api/2/issue/${issueKey}/comment")
+        .header('Content-Type', 'application/json')
+        .body([
+                body: commentBody,
+                // Make comment visible in the customer portal
+                public: true,
+        ])
+        .asObject(Map)
+}
+
+/**
+ * Updates the value of a field inside the issue
+ */
+void updateIssue(String issueKey, String customFieldId, String valueToModify) {
     HttpResponse updateIssueResult
-    if (issueKey && fieldsUpdated)
+    if (issueKey && customFieldId)
         updateIssueResult = put("/rest/api/2/issue/${issueKey}")
                 .header('Content-Type', 'application/json')
                 .body([
-                        fields: fieldsUpdated
+                       fields: [
+                            "${customFieldId}": [value: valueToModify]
+                    ]
                 ])
                 .asString()
-
     assert updateIssueResult?.status == 204
-}
-
-
-
-/**
- * Add the current user as an issue watcher
- * @param issueKey Key of the issue to update
- */
-void addWatcher(String issueKey) {
-    HttpResponse result
-    if (issueKey)
-        result = post("/rest/api/2/issue/${issueKey}/watchers")
-                .header('Content-Type', 'application/json')
-                .asJson()
-    assert result?.status == 204
 }
