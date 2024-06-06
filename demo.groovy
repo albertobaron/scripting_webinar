@@ -25,11 +25,11 @@ assert customField : "Failed to find custom field with given name"
 // Extract and store the option from the custom field
 def value = (fields[customField.id] as Map)?.value
 if (value == 'Billable'){
-    //1. Add a watcher   
+    //1. Adds a watcher   
     String accountId = '557058:17217ad2-09b8-4692-8726-8e644e401aec'
     addWatcher(issue.key, accountId)
 
-    //2. Add a comment
+    //2. Adds a comment
     String comment = 'Hey, this issue has changed'
     addComment(issue.key, comment)
 
